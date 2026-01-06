@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: nono-postgres
+    environment:
+      POSTGRES_DB: nono_system
+      POSTGRES_USER: nono
+      POSTGRES_PASSWORD: nono123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - nono-network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: nono-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - nono-network
+
+  # 预言机服务
+  oracle:
+    build:
+      context: .
+      dockerfile: oracle/Dockerfile
+    container_name: nono-oracle
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=nono_system
+      - DB_USER=nono
+      - DB_PASSWORD=nono123
+      - BLOCKCHAIN_RPC_URL=http://blockchain-node:8545
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - nono-network
+    volumes:
+      - ./config:/app/config
+
+  # 后端API服务
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: nono-backend
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=nono_system
+      - DB_USER=nono
+      - DB_PASSWORD=nono123
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - BLOCKCHAIN_RPC_URL=http://blockchain-node:8545
+    depends_on:
+      - postgres
+      - redis
+      - oracle
+    ports:
+      - "8080:8080"
+    networks:
+      - nono-network
+    volumes:
+      - ./config:/app/config
+
+volumes:
+  postgres_data:
+
+networks:
+  nono-network:
+    driver: bridge
+
