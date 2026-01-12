@@ -71,10 +71,17 @@ cp config/backend.config.example.yaml backend/config/config.yaml
 
 3. **启动服务**
 ```bash
-# 方式1: 使用启动脚本
+# 方式1: 统一启动（推荐，一键启动所有服务）
+go run ./cmd/startall
+
+# 或编译后运行
+go build -o bin/startall ./cmd/startall
+./bin/startall
+
+# 方式2: 使用启动脚本
 ./scripts/start.sh
 
-# 方式2: 使用Makefile（推荐）
+# 方式3: 使用Makefile（分别启动）
 make oracle    # 终端1
 make backend   # 终端2
 cd frontend && npm run dev  # 终端3
@@ -93,14 +100,42 @@ cd frontend && npm run dev  # 终端3
 
 请参考 [docs/QUICKSTART.md](docs/QUICKSTART.md) 获取快速测试指南。
 
+### 联盟链部署与观察
+
+- **Ganache 配置**：请参考 [docs/GANACHE_SETUP.md](docs/GANACHE_SETUP.md) 了解如何在 Ganache 上部署和查看交易
+- **联盟链观察**：请参考 [docs/BLOCKCHAIN_OBSERVATION.md](docs/BLOCKCHAIN_OBSERVATION.md) 了解如何在联盟链上观察功能实现
+- **验证指南**：请参考 [docs/VERIFY_BLOCKCHAIN.md](docs/VERIFY_BLOCKCHAIN.md) 了解如何验证跨链认证
+- **前端上链**：请参考 [docs/FRONTEND_ONCHAIN.md](docs/FRONTEND_ONCHAIN.md) 了解如何在前端直接进行上链操作
+
 ## 功能特性
 
+### 核心功能
 - ✅ 设备去中心化身份注册（DID）
 - ✅ 设备状态实时更新
 - ✅ 跨域身份认证
 - ✅ 身份吊销机制
 - ✅ 可信预言机服务
 - ✅ 多数据源聚合验证
+
+### 新增功能
+- ✅ **系统统计和仪表板** - 提供系统整体统计信息
+- ✅ **设备操作历史** - 记录设备所有操作历史，支持审计追踪
+- ✅ **批量操作** - 支持批量注册和批量更新设备状态
+- ✅ **高级搜索** - 灵活的多条件搜索和过滤功能
+- ✅ **数据导出** - 支持将设备和认证记录导出为 CSV 格式
+- ✅ **用户权限管理** - 完整的基于角色的访问控制（RBAC）系统
+
+### 权限管理
+系统支持5种角色，每种角色具有不同的权限和数据访问范围：
+- **系统管理员** - 全域数据权限，可操作所有功能
+- **系统操作人员** - 域级数据权限，仅可操作所属域设备
+- **预言机节点** - 受限数据权限，仅可更新设备状态
+- **管理/审计人员** - 只读数据权限，可查询所有记录
+- **普通用户** - 受限只读权限，仅可查看公开信息
+
+详细权限说明请参考 [docs/PERMISSIONS.md](docs/PERMISSIONS.md)
+
+详细功能说明请参考 [docs/NEW_FEATURES.md](docs/NEW_FEATURES.md)
 
 ## 许可证
 

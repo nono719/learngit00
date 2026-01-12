@@ -70,3 +70,68 @@ func ListDomains(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// UpdateDomain 更新域信息
+func UpdateDomain(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+
+		var req struct {
+			Description string `json:"description"`
+			Owner       string `json:"owner"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		var domain models.Domain
+		if err := db.Where("name = ?", name).First(&domain).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Domain not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if req.Description != "" {
+			domain.Description = req.Description
+		}
+		if req.Owner != "" {
+			domain.Owner = req.Owner
+		}
+
+		if err := db.Save(&domain).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, domain)
+	}
+}
+
+// DeleteDomain 删除域
+func DeleteDomain(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		name := c.Param("name")
+
+		var domain models.Domain
+		if err := db.Where("name = ?", name).First(&domain).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Domain not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if err := db.Delete(&domain).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Domain deleted successfully"})
+	}
+}
+

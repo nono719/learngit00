@@ -37,9 +37,46 @@ func RequestCrossDomainAuth(db *gorm.DB, bcClient *blockchain.Client) gin.Handle
 			return
 		}
 
+		// 检查设备访问权限
+		user, exists := c.Get("user")
+		if exists {
+			u := user.(*models.User)
+			// 操作人员只能发起自己域设备的跨域认证
+			if u.Role == models.RoleOperator && u.Domain != device.Domain {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Cannot request cross-domain auth for devices in other domains"})
+				return
+			}
+		}
+
 		// 检查设备状态
 		if device.Status != "active" {
 			c.JSON(http.StatusForbidden, gin.H{"error": "Device is not active"})
+			return
+		}
+
+		// 验证设备的域是否与源域匹配
+		if device.Domain != req.SourceDomain {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "源域错误",
+				"message": "设备所属域与源域不匹配",
+				"device_domain": device.Domain,
+				"source_domain": req.SourceDomain,
+			})
+			return
+		}
+
+		// 验证目标域是否存在
+		var targetDomain models.Domain
+		if err := db.Where("name = ?", req.TargetDomain).First(&targetDomain).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "目标域不存在",
+					"message": "指定的目标域在系统中不存在",
+					"target_domain": req.TargetDomain,
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -116,6 +153,141 @@ func RequestCrossDomainAuth(db *gorm.DB, bcClient *blockchain.Client) gin.Handle
 		}
 
 		c.JSON(http.StatusOK, response)
+	}
+}
+
+// SyncAuthRecord 同步前端上链的认证记录到数据库
+func SyncAuthRecord(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			DeviceDID    string `json:"device_did" binding:"required"`
+			SourceDomain string `json:"source_domain" binding:"required"`
+			TargetDomain string `json:"target_domain" binding:"required"`
+			TxHash       string `json:"tx_hash" binding:"required"`
+			Authorized   bool   `json:"authorized"`
+			BlockNumber  *uint64 `json:"block_number,omitempty"`
+		}
+
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 检查设备是否存在
+		var device models.Device
+		if err := db.Where("d_id = ?", req.DeviceDID).First(&device).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Device not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 验证设备的域是否与源域匹配
+		if device.Domain != req.SourceDomain {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "源域错误",
+				"message": "设备所属域与源域不匹配",
+				"device_domain": device.Domain,
+				"source_domain": req.SourceDomain,
+			})
+			return
+		}
+
+		// 验证目标域是否存在
+		var targetDomain models.Domain
+		if err := db.Where("name = ?", req.TargetDomain).First(&targetDomain).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "目标域不存在",
+					"message": "指定的目标域在系统中不存在",
+					"target_domain": req.TargetDomain,
+				})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 检查是否已存在相同的交易哈希记录
+		var existingRecord models.AuthRecord
+		if err := db.Where("tx_hash = ?", req.TxHash).First(&existingRecord).Error; err == nil {
+			// 记录已存在，返回现有记录
+			c.JSON(http.StatusOK, gin.H{
+				"message":   "Record already exists",
+				"record_id": existingRecord.ID,
+				"record":    existingRecord,
+			})
+			return
+		}
+
+		// 检查是否存在相同设备、源域、目标域但没有交易哈希的记录
+		var existingRecordWithoutTx models.AuthRecord
+		if err := db.Where("device_did = ? AND source_domain = ? AND target_domain = ? AND (tx_hash = '' OR tx_hash IS NULL)", 
+			req.DeviceDID, req.SourceDomain, req.TargetDomain).First(&existingRecordWithoutTx).Error; err == nil {
+			// 更新现有记录的交易哈希
+			existingRecordWithoutTx.TxHash = req.TxHash
+			existingRecordWithoutTx.Authorized = req.Authorized
+			if err := db.Save(&existingRecordWithoutTx).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			
+			// 记录日志
+			message := "Cross-domain authentication (frontend onchain sync, txHash: " + req.TxHash + ")"
+			authLog := models.AuthLog{
+				DeviceDID:    req.DeviceDID,
+				SourceDomain: req.SourceDomain,
+				TargetDomain: req.TargetDomain,
+				Action:       "success",
+				Message:      message,
+				IPAddress:    c.ClientIP(),
+				UserAgent:    c.GetHeader("User-Agent"),
+			}
+			db.Create(&authLog)
+
+			c.JSON(http.StatusOK, gin.H{
+				"message":   "Record updated successfully",
+				"record_id": existingRecordWithoutTx.ID,
+				"record":    existingRecordWithoutTx,
+			})
+			return
+		}
+
+		// 创建新的认证记录
+		authRecord := models.AuthRecord{
+			DeviceDID:    req.DeviceDID,
+			SourceDomain: req.SourceDomain,
+			TargetDomain: req.TargetDomain,
+			Authorized:   req.Authorized,
+			TxHash:       req.TxHash,
+			Timestamp:    time.Now(),
+		}
+
+		if err := db.Create(&authRecord).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 记录日志
+		message := "Cross-domain authentication (frontend onchain, txHash: " + req.TxHash + ")"
+		authLog := models.AuthLog{
+			DeviceDID:    req.DeviceDID,
+			SourceDomain: req.SourceDomain,
+			TargetDomain: req.TargetDomain,
+			Action:       "success",
+			Message:      message,
+			IPAddress:    c.ClientIP(),
+			UserAgent:    c.GetHeader("User-Agent"),
+		}
+		db.Create(&authLog)
+
+		c.JSON(http.StatusCreated, gin.H{
+			"message":   "Record synced successfully",
+			"record_id": authRecord.ID,
+			"record":    authRecord,
+		})
 	}
 }
 

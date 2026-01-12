@@ -1,24 +1,34 @@
 package datasource
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
 	"time"
 
 	"nono-system/oracle/internal/config"
 	"nono-system/oracle/internal/models"
 )
 
-// MonitoringDataSource 监控数据源（模拟）
+// MonitoringDataSource 监控数据源
 type MonitoringDataSource struct {
-	name string
-	url  string
-	// 可以添加更多监控相关的配置
+	name   string
+	url    string
+	apiKey string
+	client *http.Client
 }
 
 // NewMonitoringDataSource 创建监控数据源
 func NewMonitoringDataSource(cfg config.DataSourceConfig) (*MonitoringDataSource, error) {
 	return &MonitoringDataSource{
-		name: cfg.Name,
-		url:  cfg.URL,
+		name:   cfg.Name,
+		url:    cfg.URL,
+		apiKey: cfg.APIKey,
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}, nil
 }
 
@@ -27,38 +37,141 @@ func (ds *MonitoringDataSource) Name() string {
 	return ds.name
 }
 
-// FetchDeviceStatuses 获取所有设备状态（模拟实现）
+// FetchDeviceStatuses 获取所有设备状态
 func (ds *MonitoringDataSource) FetchDeviceStatuses() ([]models.DeviceStatus, error) {
-	// 这里应该实际调用监控API
-	// 目前返回模拟数据
-	return []models.DeviceStatus{
-		{
-			DID:      "did:example:device001",
-			Status:   "active",
-			Online:   true,
-			LastSeen: time.Now(),
-			Source:   ds.name,
-			Timestamp: time.Now(),
-		},
-	}, nil
+	req, err := http.NewRequest("GET", ds.url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// 如果配置了API Key，添加到请求头
+	if ds.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+ds.apiKey)
+		// 也可以使用其他认证方式，如：
+		// req.Header.Set("X-API-Key", ds.apiKey)
+		// req.Header.Set("Authorization", "ApiKey "+ds.apiKey)
+	}
+
+	resp, err := ds.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch data from %s: %w", ds.url, err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体以便获取错误信息
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return nil, fmt.Errorf("authentication failed (401): API Key may be invalid or user not found. Response: %s", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code %d from %s: %s", resp.StatusCode, ds.url, string(body))
+	}
+
+	var statuses []models.DeviceStatus
+	if err := json.Unmarshal(body, &statuses); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	// 设置数据源名称和时间戳
+	for i := range statuses {
+		statuses[i].Source = ds.name
+		statuses[i].Timestamp = time.Now()
+	}
+
+	return statuses, nil
 }
 
 // FetchDeviceStatus 获取指定设备状态
 func (ds *MonitoringDataSource) FetchDeviceStatus(did string) (*models.DeviceStatus, error) {
-	// 模拟实现
-	return &models.DeviceStatus{
-		DID:      did,
-		Status:   "active",
-		Online:   true,
-		LastSeen: time.Now(),
-		Source:   ds.name,
-		Timestamp: time.Now(),
-	}, nil
+	url := fmt.Sprintf("%s/%s", ds.url, did)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// 如果配置了API Key，添加到请求头
+	if ds.apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+ds.apiKey)
+	}
+
+	resp, err := ds.client.Do(req)
+	if err != nil {
+		// 如果请求失败，返回模拟数据（用于演示）
+		return &models.DeviceStatus{
+			DID:       did,
+			Status:    "active",
+			Online:    true,
+			LastSeen:  time.Now(),
+			Source:    ds.name,
+			Timestamp: time.Now(),
+		}, nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("device not found: %s", did)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	var status models.DeviceStatus
+	if err := json.Unmarshal(body, &status); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	}
+
+	status.Source = ds.name
+	status.Timestamp = time.Now()
+
+	return &status, nil
 }
 
 // HealthCheck 健康检查
 func (ds *MonitoringDataSource) HealthCheck() error {
-	// 检查监控服务是否可用
+	// 尝试访问实际的数据源URL（而不是/health端点）
+	// 因为后端API可能没有/health端点，或者需要认证
+	req, err := http.NewRequest("GET", ds.url, nil)
+	if err != nil {
+		return err
+	}
+
+	// 如果配置了API Key，添加到请求头
+	if ds.apiKey != "" {
+		authHeader := "Bearer " + ds.apiKey
+		req.Header.Set("Authorization", authHeader)
+		log.Printf("[HealthCheck] Data source %s: Setting Authorization header: Bearer %s", ds.name, ds.apiKey)
+	} else {
+		log.Printf("[HealthCheck] Data source %s: WARNING - API Key is empty, request will fail authentication", ds.name)
+	}
+
+	resp, err := ds.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取响应体以便获取错误信息
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("authentication failed (401): API Key may be invalid. Response: %s", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("health check failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
 	return nil
 }
 

@@ -22,10 +22,10 @@ type ServerConfig struct {
 }
 
 type BlockchainConfig struct {
-	RPCURL      string
-	ChainID     int64
-	ContractAddr string
-	PrivateKey  string
+	RPCURL      string `mapstructure:"rpc_url" yaml:"rpc_url"`
+	ChainID     int64  `mapstructure:"chain_id" yaml:"chain_id"`
+	ContractAddr string `mapstructure:"contract_addr" yaml:"contract_addr"`
+	PrivateKey  string `mapstructure:"private_key" yaml:"private_key"`
 }
 
 type DatabaseConfig struct {
@@ -50,11 +50,11 @@ type OracleConfig struct {
 }
 
 type DataSourceConfig struct {
-	Name     string
-	Type     string // "api", "certificate", "monitoring"
-	URL      string
-	APIKey   string
-	Enabled  bool
+	Name     string `mapstructure:"name" yaml:"name"`
+	Type     string `mapstructure:"type" yaml:"type"` // "api", "certificate", "monitoring"
+	URL      string `mapstructure:"url" yaml:"url"`
+	APIKey   string `mapstructure:"api_key" yaml:"api_key"`
+	Enabled  bool   `mapstructure:"enabled" yaml:"enabled"`
 }
 
 func Load() (*Config, error) {
@@ -81,8 +81,41 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
+	// 备用：如果自动映射失败，手动读取关键字段
+	if cfg.Blockchain.ContractAddr == "" {
+		cfg.Blockchain.ContractAddr = viper.GetString("blockchain.contract_addr")
+	}
+	if cfg.Blockchain.PrivateKey == "" {
+		cfg.Blockchain.PrivateKey = viper.GetString("blockchain.private_key")
+	}
+	if cfg.Blockchain.RPCURL == "" {
+		cfg.Blockchain.RPCURL = viper.GetString("blockchain.rpc_url")
+	}
+	
+	// 手动读取数据源（如果自动映射失败）
+	if len(cfg.DataSources) == 0 && viper.IsSet("data_sources") {
+		var dataSources []DataSourceConfig
+		if err := viper.UnmarshalKey("data_sources", &dataSources); err == nil && len(dataSources) > 0 {
+			cfg.DataSources = dataSources
+		}
+	}
+
 	// 从环境变量覆盖配置
 	overrideFromEnv(&cfg)
+
+	// 调试：打印配置信息
+	fmt.Printf("Loaded config - Blockchain ContractAddr: '%s', PrivateKey length: %d\n", 
+		cfg.Blockchain.ContractAddr, len(cfg.Blockchain.PrivateKey))
+	fmt.Printf("Loaded config - DataSources count: %d\n", len(cfg.DataSources))
+	for i, ds := range cfg.DataSources {
+		fmt.Printf("  DataSource[%d]: name=%s, type=%s, url=%s, api_key=%s, enabled=%v\n",
+			i, ds.Name, ds.Type, ds.URL, func() string {
+				if ds.APIKey != "" {
+					return "configured"
+				}
+				return "not configured"
+			}(), ds.Enabled)
+	}
 
 	return &cfg, nil
 }

@@ -161,7 +161,12 @@ contract DeviceIdentity {
     /**
      * @dev 查询设备信息
      * @param _did 设备DID
-     * @return 设备信息
+     * @return did 设备DID标识符
+     * @return metadata 设备元数据
+     * @return status 设备状态
+     * @return deviceOwner 设备所有者地址
+     * @return registeredAt 注册时间戳
+     * @return lastUpdated 最后更新时间戳
      */
     function getDevice(string memory _did) public view returns (
         string memory did,

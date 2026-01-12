@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,21 @@ type Server struct {
 // New 创建新的HTTP服务器
 func New(cfg *config.Config, oracleService *oracle.Oracle) *Server {
 	router := gin.Default()
+
+	// 添加CORS中间件
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	})
 
 	srv := &Server{
 		config: cfg,
@@ -43,7 +59,12 @@ func (s *Server) registerRoutes(router *gin.Engine) {
 	api := router.Group("/api/v1")
 	{
 		api.GET("/health", s.healthCheck)
+		api.GET("/status", s.getOracleStatus)
+		api.GET("/config", s.getConfig)
+		api.GET("/datasources", s.getDataSources)
 		api.GET("/device/:did/status", s.getDeviceStatus)
+		api.GET("/devices/status", s.getAllDevicesStatus)
+		api.GET("/consensus/:did", s.getConsensusStatus)
 	}
 }
 
@@ -53,10 +74,79 @@ func (s *Server) healthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, health)
 }
 
+// getOracleStatus 获取预言机状态
+func (s *Server) getOracleStatus(c *gin.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in getOracleStatus: %v", r)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("Internal server error: %v", r),
+			})
+		}
+	}()
+
+	if s.oracle == nil {
+		log.Printf("Error: Oracle service is nil")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Oracle service not initialized",
+		})
+		return
+	}
+
+	status := s.oracle.GetStatus()
+	c.JSON(http.StatusOK, status)
+}
+
+// getConfig 获取配置信息（不包含敏感信息）
+func (s *Server) getConfig(c *gin.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in getConfig: %v", r)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("Internal server error: %v", r),
+			})
+		}
+	}()
+
+	if s.oracle == nil {
+		log.Printf("Error: Oracle service is nil")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Oracle service not initialized",
+		})
+		return
+	}
+
+	config := s.oracle.GetConfig()
+	c.JSON(http.StatusOK, config)
+}
+
+// getDataSources 获取数据源列表
+func (s *Server) getDataSources(c *gin.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Panic in getDataSources: %v", r)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("Internal server error: %v", r),
+			})
+		}
+	}()
+
+	if s.oracle == nil {
+		log.Printf("Error: Oracle service is nil")
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Oracle service not initialized",
+		})
+		return
+	}
+
+	sources := s.oracle.GetDataSources()
+	c.JSON(http.StatusOK, sources)
+}
+
 // getDeviceStatus 获取设备状态
 func (s *Server) getDeviceStatus(c *gin.Context) {
 	did := c.Param("did")
-	
+
 	status, err := s.oracle.GetDeviceStatus(did)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -64,6 +154,25 @@ func (s *Server) getDeviceStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, status)
+}
+
+// getAllDevicesStatus 获取所有设备状态
+func (s *Server) getAllDevicesStatus(c *gin.Context) {
+	statuses := s.oracle.GetAllDevicesStatus()
+	c.JSON(http.StatusOK, statuses)
+}
+
+// getConsensusStatus 获取设备共识状态
+func (s *Server) getConsensusStatus(c *gin.Context) {
+	did := c.Param("did")
+
+	consensus, err := s.oracle.GetConsensusStatus(did)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, consensus)
 }
 
 // Start 启动服务器
@@ -75,4 +184,3 @@ func (s *Server) Start() error {
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.httpSrv.Shutdown(ctx)
 }
-

@@ -30,16 +30,31 @@ type Client struct {
 
 // NewClient 创建新的区块链客户端
 func NewClient(cfg config.BlockchainConfig) (*Client, error) {
+	// 检查配置是否有效
+	if cfg.RPCURL == "" {
+		return nil, fmt.Errorf("blockchain RPC URL is not configured")
+	}
+
+	// 检查合约地址
+	if cfg.ContractAddr == "" || cfg.ContractAddr == "0x0000000000000000000000000000000000000000" {
+		return nil, fmt.Errorf("blockchain contract address is not configured or is default value")
+	}
+
+	// 检查私钥
+	if cfg.PrivateKey == "" || cfg.PrivateKey == "your_oracle_private_key_here" {
+		return nil, fmt.Errorf("blockchain private key is not configured or is default value")
+	}
+
 	// 连接区块链节点
 	client, err := ethclient.Dial(cfg.RPCURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to blockchain: %w", err)
+		return nil, fmt.Errorf("failed to connect to blockchain RPC (%s): %w", cfg.RPCURL, err)
 	}
 
 	// 解析合约地址
 	contractAddr := common.HexToAddress(cfg.ContractAddr)
 	if contractAddr == (common.Address{}) {
-		return nil, fmt.Errorf("invalid contract address")
+		return nil, fmt.Errorf("invalid contract address: %s", cfg.ContractAddr)
 	}
 
 	// 加载合约ABI（简化版，实际应从文件加载）
@@ -48,10 +63,20 @@ func NewClient(cfg config.BlockchainConfig) (*Client, error) {
 		return nil, fmt.Errorf("failed to parse contract ABI: %w", err)
 	}
 
+	// 清理私钥格式（移除可能的重复0x前缀）
+	privateKeyStr := cfg.PrivateKey
+	if strings.HasPrefix(privateKeyStr, "0x") {
+		privateKeyStr = strings.TrimPrefix(privateKeyStr, "0x")
+	}
+	// 如果还有0x前缀，再次移除（处理0x0x...的情况）
+	if strings.HasPrefix(privateKeyStr, "0x") {
+		privateKeyStr = strings.TrimPrefix(privateKeyStr, "0x")
+	}
+
 	// 解析私钥
-	privateKey, err := crypto.HexToECDSA(cfg.PrivateKey)
+	privateKey, err := crypto.HexToECDSA(privateKeyStr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
+		return nil, fmt.Errorf("failed to parse private key (format error): %w", err)
 	}
 
 	chainID := big.NewInt(cfg.ChainID)
@@ -147,4 +172,3 @@ func (c *Client) GetDeviceStatus(did string) (int, error) {
 
 	return status, nil
 }
-

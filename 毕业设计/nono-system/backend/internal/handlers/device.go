@@ -162,7 +162,7 @@ func RevokeDevice(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// ListDevices 列出设备
+// ListDevices 列出设备（带权限过滤）
 func ListDevices(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		domain := c.Query("domain")
@@ -171,7 +171,24 @@ func ListDevices(db *gorm.DB) gin.HandlerFunc {
 		var devices []models.Device
 		query := db.Model(&models.Device{})
 
+		// 应用数据权限过滤
+		permissionType, exists := c.Get("data_permission")
+		if exists {
+			pt := permissionType.(string)
+			if pt == "domain" {
+				userDomain, exists := c.Get("user_domain")
+				if exists && userDomain.(string) != "" {
+					query = query.Where("domain = ?", userDomain.(string))
+				}
+			}
+		}
+
 		if domain != "" {
+			// 检查域访问权限
+			if !CheckDomainAccess(c, domain) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this domain"})
+				return
+			}
 			query = query.Where("domain = ?", domain)
 		}
 		if status != "" {
@@ -187,3 +204,74 @@ func ListDevices(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
+// CheckDomainAccess 检查域访问权限（辅助函数）
+func CheckDomainAccess(c *gin.Context, domain string) bool {
+	user, exists := c.Get("user")
+	if !exists {
+		return false
+	}
+	u := user.(*models.User)
+	return u.CanAccessDomain(domain)
+}
+
+// GetDeviceStatuses 获取设备状态列表（供预言机使用）
+// 返回格式：[]DeviceStatus
+func GetDeviceStatuses(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var devices []models.Device
+		query := db.Model(&models.Device{})
+
+		// 应用数据权限过滤
+		permissionType, exists := c.Get("data_permission")
+		if exists {
+			pt := permissionType.(string)
+			if pt == "domain" {
+				userDomain, exists := c.Get("user_domain")
+				if exists && userDomain.(string) != "" {
+					query = query.Where("domain = ?", userDomain.(string))
+				}
+			}
+		}
+
+		// 支持按域和状态过滤
+		if domain := c.Query("domain"); domain != "" {
+			if !CheckDomainAccess(c, domain) {
+				c.JSON(http.StatusForbidden, gin.H{"error": "Access denied to this domain"})
+				return
+			}
+			query = query.Where("domain = ?", domain)
+		}
+		if status := c.Query("status"); status != "" {
+			query = query.Where("status = ?", status)
+		}
+
+		if err := query.Find(&devices).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		// 转换为预言机需要的格式
+		type DeviceStatus struct {
+			DID       string    `json:"did"`
+			Status    string    `json:"status"`    // active, suspicious, revoked
+			Online    bool      `json:"online"`   // 根据状态判断：active=true, 其他=false
+			LastSeen  time.Time `json:"last_seen"` // 使用 LastUpdated
+			Source    string    `json:"source"`    // 数据源名称
+			Timestamp time.Time `json:"timestamp"` // 当前时间
+		}
+
+		statuses := make([]DeviceStatus, len(devices))
+		for i, device := range devices {
+			statuses[i] = DeviceStatus{
+				DID:       device.DID,
+				Status:    device.Status,
+				Online:    device.Status == "active",
+				LastSeen:  device.LastUpdated,
+				Source:    "backend_api",
+				Timestamp: time.Now(),
+			}
+		}
+
+		c.JSON(http.StatusOK, statuses)
+	}
+}

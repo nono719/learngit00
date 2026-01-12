@@ -47,6 +47,8 @@ config/*.yaml
 config/*.yml
 !config/*.example.yaml
 !config/*.example.yml
+backend/config/config.yaml
+oracle/config/config.yaml
 
 # 区块链相关
 *.keystore
