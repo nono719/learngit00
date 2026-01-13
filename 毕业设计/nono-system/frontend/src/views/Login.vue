@@ -88,16 +88,35 @@ const handleLogin = async () => {
     try {
       const result = await authApi.login(loginForm)
       
+      // 确保 token 是字符串格式
+      const token = String(result.token || result.user?.id || '')
+      if (!token) {
+        throw new Error('登录失败：未收到有效的 token')
+      }
+      
       // 保存 token 和用户信息
-      localStorage.setItem('token', result.token)
-      localStorage.setItem('user', JSON.stringify(result.user))
+      localStorage.setItem('token', token)
+      if (result.user) {
+        localStorage.setItem('user', JSON.stringify(result.user))
+      }
+      
+      // 触发自定义事件，通知 App 组件更新登录状态
+      window.dispatchEvent(new Event('login-status-changed'))
       
       ElMessage.success('登录成功')
       
       // 跳转到首页
       router.push('/')
     } catch (error) {
-      ElMessage.error(error.message || '登录失败')
+      console.error('登录错误:', error)
+      const errorMsg = error.message || '登录失败'
+      if (errorMsg.includes('Invalid username or password')) {
+        ElMessage.error('用户名或密码错误')
+      } else if (errorMsg.includes('Unauthorized')) {
+        ElMessage.error('用户名或密码错误')
+      } else {
+        ElMessage.error(errorMsg)
+      }
     } finally {
       loading.value = false
     }
@@ -118,11 +137,59 @@ const quickLogin = async (username, password) => {
   align-items: center;
   min-height: 100vh;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: move 20s linear infinite;
+}
+
+@keyframes move {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(50px, 50px);
+  }
 }
 
 .login-card {
   width: 100%;
-  max-width: 450px;
+  max-width: 480px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.95);
+  position: relative;
+  z-index: 1;
+  animation: fadeInUp 0.6s ease;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:deep(.el-card__header) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px 16px 0 0;
+  padding: 30px;
+  border: none;
 }
 
 .login-header {
@@ -131,13 +198,56 @@ const quickLogin = async (username, password) => {
 
 .login-header h2 {
   margin: 0 0 10px 0;
-  color: #303133;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 600;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .login-header p {
   margin: 0;
-  color: #909399;
+  color: rgba(255, 255, 255, 0.9);
   font-size: 14px;
+}
+
+:deep(.el-card__body) {
+  padding: 40px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #606266;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  height: 44px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+:deep(.el-divider__text) {
+  background: rgba(255, 255, 255, 0.95);
+  color: #909399;
+  font-size: 12px;
 }
 
 .quick-login {
@@ -146,9 +256,20 @@ const quickLogin = async (username, password) => {
 }
 
 .quick-login p {
-  margin-bottom: 10px;
-  color: #909399;
+  margin-bottom: 15px;
+  color: #606266;
   font-size: 14px;
+  font-weight: 500;
+}
+
+:deep(.el-button--small) {
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button--small:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 </style>
 

@@ -1137,12 +1137,106 @@ onMounted(() => {
 
 <style scoped>
 .oracle-page {
-  padding: 20px;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+:deep(.el-card--hover) {
+  transition: all 0.3s ease;
+}
+
+:deep(.el-card--hover:hover) {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+:deep(.el-statistic) {
+  text-align: center;
+}
+
+:deep(.el-statistic__head) {
+  color: #909399;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+:deep(.el-statistic__number) {
+  font-weight: 600;
+  color: #303133;
+}
+
+:deep(.el-tabs--border-card) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-tabs__header) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  margin: 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #667eea;
+  font-weight: 600;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table tr:hover) {
+  background: #f8f9fa;
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 </style>

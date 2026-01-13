@@ -58,7 +58,39 @@ onMounted(() => {
 
 <style scoped>
 .logs-page {
-  padding: 20px;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table tr:hover) {
+  background: #f8f9fa;
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
 }
 </style>
 

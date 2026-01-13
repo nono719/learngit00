@@ -31,5 +31,11 @@ export default {
     const encodedDid = encodeURIComponent(did)
     return api.delete(`/devices/${encodedDid}`)
   },
+
+  // 获取设备历史记录
+  getHistory(did, params) {
+    const encodedDid = encodeURIComponent(did)
+    return api.get(`/devices/${encodedDid}/history`, { params })
+  },
 }
 

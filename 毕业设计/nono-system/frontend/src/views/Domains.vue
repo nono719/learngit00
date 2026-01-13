@@ -77,10 +77,51 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.domains-page {
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table tr:hover) {
+  background: #f8f9fa;
 }
 </style>
 

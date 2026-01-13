@@ -48,7 +48,17 @@ func AuthMiddleware(db *gorm.DB) gin.HandlerFunc {
 		}
 		
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			if err == gorm.ErrRecordNotFound {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Invalid token",
+					"message": "用户不存在或已被禁用",
+				})
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"error": "Invalid token",
+					"message": "token 验证失败",
+				})
+			}
 			c.Abort()
 			return
 		}

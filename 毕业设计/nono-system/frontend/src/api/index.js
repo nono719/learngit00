@@ -29,15 +29,37 @@ api.interceptors.response.use(
   (error) => {
     // 处理 401 未授权错误
     if (error.response?.status === 401) {
-      // 清除 token 并跳转到登录页
+      const errorMsg = error.response?.data?.error || '未授权'
+      
+      // 清除 token 和用户信息
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      
       // 如果不在登录页，则跳转
       if (window.location.pathname !== '/login') {
-        window.location.href = '/login'
-        ElMessage.error('登录已过期，请重新登录')
+        // 延迟跳转，确保消息能显示
+        setTimeout(() => {
+          window.location.href = '/login'
+        }, 100)
+        
+        // 根据错误类型显示不同的提示
+        if (errorMsg.includes('Authorization header required')) {
+          ElMessage.error('未登录，请先登录')
+        } else if (errorMsg.includes('Invalid token')) {
+          ElMessage.error('登录已过期或无效，请重新登录')
+        } else {
+          ElMessage.error('登录已过期，请重新登录')
+        }
+      } else {
+        // 在登录页时也显示错误
+        if (errorMsg.includes('Invalid username or password')) {
+          // 登录页的错误由登录组件自己处理
+        } else {
+          ElMessage.warning('请先登录')
+        }
       }
     }
+    
     const message = error.response?.data?.error || error.message || '请求失败'
     return Promise.reject(new Error(message))
   }

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Dashboard from '../views/Dashboard.vue'
 import Devices from '../views/Devices.vue'
 import Domains from '../views/Domains.vue'
 import Auth from '../views/Auth.vue'
@@ -16,7 +17,13 @@ const routes = [
   },
   {
     path: '/',
-    redirect: '/devices',
+    redirect: '/dashboard',
+  },
+  {
+    path: '/dashboard',
+    name: 'Dashboard',
+    component: Dashboard,
+    meta: { requiresAuth: true },
   },
   {
     path: '/devices',

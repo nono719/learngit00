@@ -45,17 +45,28 @@
             </el-form-item>
             <el-form-item>
               <el-button 
+                v-if="!blockchainConnected"
                 type="primary" 
                 @click="connectGanache" 
                 :loading="connecting"
-                :disabled="blockchainConnected"
               >
+                <el-icon><Link /></el-icon>
                 连接 Ganache
+              </el-button>
+              <el-button 
+                v-else
+                type="success"
+                disabled
+              >
+                <el-icon><CircleCheck /></el-icon>
+                已连接
               </el-button>
               <el-button 
                 v-if="blockchainConnected" 
                 @click="disconnectBlockchain"
+                style="margin-left: 10px"
               >
+                <el-icon><Close /></el-icon>
                 断开连接
               </el-button>
             </el-form-item>
@@ -73,17 +84,28 @@
             </el-form-item>
             <el-form-item>
               <el-button 
+                v-if="!blockchainConnected"
                 type="primary" 
                 @click="connectMetaMask" 
                 :loading="connecting"
-                :disabled="blockchainConnected"
               >
+                <el-icon><Link /></el-icon>
                 连接 MetaMask
+              </el-button>
+              <el-button 
+                v-else
+                type="success"
+                disabled
+              >
+                <el-icon><CircleCheck /></el-icon>
+                已连接
               </el-button>
               <el-button 
                 v-if="blockchainConnected" 
                 @click="disconnectBlockchain"
+                style="margin-left: 10px"
               >
+                <el-icon><Close /></el-icon>
                 断开连接
               </el-button>
             </el-form-item>
@@ -466,7 +488,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CircleCheck, CircleClose, Link, DocumentCopy, Plus, Search } from '@element-plus/icons-vue'
+import { CircleCheck, CircleClose, Link, DocumentCopy, Plus, Search, Close } from '@element-plus/icons-vue'
 import api from '../api'
 import authApi from '../api/auth'
 import deviceApi from '../api/device'
@@ -1270,7 +1292,18 @@ const copyText = async (text) => {
 
 <style scoped>
 .auth-page {
-  padding: 20px;
+  animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .card-header {
@@ -1279,8 +1312,68 @@ const copyText = async (text) => {
   align-items: center;
 }
 
+:deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+:deep(.el-button--primary:hover) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+:deep(.el-tabs--border-card) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-tabs__header) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  margin: 0;
+  border-bottom: 1px solid #e9ecef;
+}
+
+:deep(.el-tabs__item.is-active) {
+  color: #667eea;
+  font-weight: 600;
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+  padding: 4px 12px;
+}
+
 :deep(.el-descriptions__label) {
   font-weight: 600;
+  color: #606266;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  color: #606266;
+  font-weight: 600;
+}
+
+:deep(.el-table tr:hover) {
+  background: #f8f9fa;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
 }
 </style>
 

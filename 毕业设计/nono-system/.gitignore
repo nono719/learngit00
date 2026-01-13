@@ -69,3 +69,10 @@ temp/
 .DS_Store
 Thumbs.db
 
+# Cargo (Rust)
+.cargo/
+**/.cargo/
+
+# 其他项目目录
+../*/
+!../毕业设计/
